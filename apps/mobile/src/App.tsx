@@ -1,22 +1,29 @@
 import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'react-native';
-import { OnboardingFlow } from './features/auth/OnboardingFlow';
-import { CommunityNavigator } from './navigation/CommunityNavigator';
-import { PulsarTheme } from './theme/theme';
+import { ForestOnboarding } from './features/forestmesh/ForestOnboarding';
+import { ForestNavigator } from './navigation/ForestNavigator';
+import type { UserRole } from '@pulsar/shared-types';
 
 export default function App() {
-  const [user, setUser] = useState<{ name: string; phone: string; countryCode: string } | null>(
-    null
-  );
+  const [profile, setProfile] = useState<{
+    name: string;
+    phone: string;
+    role: UserRole;
+    zoneId: string;
+  } | null>(null);
 
   return (
     <NavigationContainer>
-      <StatusBar barStyle="light-content" backgroundColor={PulsarTheme.colors.canvas} />
-      {user ? (
-        <CommunityNavigator userName={user.name} countryCode={user.countryCode} />
+      <StatusBar barStyle="light-content" backgroundColor="#060E0A" />
+      {profile ? (
+        <ForestNavigator
+          userName={profile.name}
+          role={profile.role}
+          zone={profile.zoneId}
+        />
       ) : (
-        <OnboardingFlow onComplete={(u) => setUser(u)} />
+        <ForestOnboarding onComplete={(p) => setProfile(p)} />
       )}
     </NavigationContainer>
   );
