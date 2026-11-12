@@ -1,0 +1,16 @@
+{
+  "name": "pulsar-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pulsar — Decentralized emergency communication and public safety platform (Android + Backend + Admin Dashboards)",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

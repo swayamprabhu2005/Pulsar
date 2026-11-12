@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  phoneHash    String   @unique
+  phoneMasked  String
+  name         String
+  avatarUrl    String?
+  countryCode  String   @default("IN")
+  role         String   @default("CITIZEN")
+  isVerified   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  devices      Device[]
+  contacts     Contact[] @relation("ContactOwner")
+  incidents    EmergencyIncident[]
+  safeWalks    SafeWalkSession[]
+  messages     Message[]
+  participants ConversationParticipant[]
+  auditLogs    AuditLog[]
+}
+
+model OtpVerification {
+  id          String   @id @default(uuid())
+  phoneHash   String
+  codeHash    String
+  expiresAt   DateTime
+  attempts    Int      @default(0)
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([phoneHash])
+}
+
+model Device {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceFingerprint String   @unique
+  pushToken         String?
+  publicKey         String?
+  platform          String   @default("android")
+  appVersion        String   @default("0.1.0")
+  edition           String   @default("COMMUNITY")
+  lastSeen          DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Contact {
+  id            String   @id @default(uuid())
+  ownerId       String
+  owner         User     @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  contactUserId String?
+  phoneHash     String
+  displayName   String
+  isTrusted     Boolean  @default(false)
+  syncedAt      DateTime @default(now())
+
+  @@unique([ownerId, phoneHash])
+  @@index([phoneHash])
+}
+
+model Conversation {
+  id             String   @id @default(uuid())
+  type           String   @default("DIRECT")
+  name           String?
+  isE2eEncrypted Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  participants   ConversationParticipant[]
+  messages       Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("MEMBER")
+  joinedAt       DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id               String       @id @default(uuid())
+  packetId         String?      @unique
+  conversationId   String
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId         String
+  sender           User         @relation(fields: [senderId], references: [id])
+  encryptedPayload String
+  messageType      String       @default("MESSAGE")
+  priority         String       @default("NORMAL")
+  ttl              Int          @default(7)
+  createdAt        DateTime     @default(now())
+  expiresAt        DateTime
+
+  deliveries       MessageDelivery[]
+
+  @@index([conversationId, createdAt])
+}
+
+model MessageDelivery {
+  id            String    @id @default(uuid())
+  messageId     String
+  message       Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  recipientId   String
+  status        String    @default("QUEUED")
+  transportUsed String    @default("INTERNET")
+  deliveredAt   DateTime?
+  readAt        DateTime?
+
+  @@unique([messageId, recipientId])
+}
+
+model EmergencyIncident {
+  id               String   @id @default(uuid())
+  reporterId       String
+  reporter         User     @relation(fields: [reporterId], references: [id])
+  category         String
+  priority         String   @default("CRITICAL")
+  latitude         Float?
+  longitude        Float?
+  locationAccuracy Float?
+  description      String?
+  status           String   @default("DISPATCHED_SERVER")
+  isTestMode       Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  attachments      IncidentAttachment[]
+
+  @@index([status, createdAt])
+}
+
+model IncidentAttachment {
+  id         String            @id @default(uuid())
+  incidentId String
+  incident   EmergencyIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  type       String
+  storageUrl String
+  createdAt  DateTime          @default(now())
+}
+
+model EmergencyNumberConfig {
+  id             String   @id @default(uuid())
+  countryCode    String
+  serviceType    String
+  displayName    String
+  number         String
+  officialSource String
+  region         String   @default("National")
+  isEnabled      Boolean  @default(true)
+  verifiedDate   DateTime @default(now())
+
+  @@index([countryCode])
+}
+
+model AnnouncementChannel {
+  id                 String   @id @default(uuid())
+  name               String
+  description        String?
+  creatorId          String
+  verificationStatus String   @default("UNVERIFIED")
+  scopeType          String   @default("COMMUNITY")
+  geoScope           String?
+  createdAt          DateTime @default(now())
+
+  announcements      Announcement[]
+}
+
+model Announcement {
+  id               String              @id @default(uuid())
+  channelId        String
+  channel          AnnouncementChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  senderId         String
+  encryptedPayload String
+  priority         String              @default("NORMAL")
+  expiresAt        DateTime
+  signature        String
+  createdAt        DateTime            @default(now())
+
+  @@index([channelId, expiresAt])
+}
+
+model SafeWalkSession {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  status          String    @default("ACTIVE")
+  expectedArrival DateTime
+  lastCheckIn     DateTime  @default(now())
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+}
+
+model ForestZone {
+  id              String   @id @default(uuid())
+  name            String
+  region          String
+  geojsonBoundary String?
+  isActive        Boolean  @default(true)
+
+  relayStations   RelayStation[]
+  patrolTeams     PatrolTeam[]
+  tripGroups      TripGroup[]
+}
+
+model PatrolTeam {
+  id     String     @id @default(uuid())
+  zoneId String
+  zone   ForestZone @relation(fields: [zoneId], references: [id])
+  name   String
+  status String     @default("ACTIVE")
+}
+
+model RelayStation {
+  id                    String     @id @default(uuid())
+  relayUid              String     @unique
+  zoneId                String
+  zone                  ForestZone @relation(fields: [zoneId], references: [id])
+  firmwareVersion       String     @default("0.1.0-sim")
+  transportCapabilities String     @default("BLE,WIFI")
+  latitude              Float?
+  longitude             Float?
+  status                String     @default("ONLINE")
+  lastSeen              DateTime   @default(now())
+
+  history               RelayStatusHistory[]
+}
+
+model RelayStatusHistory {
+  id               String       @id @default(uuid())
+  relayId          String
+  relay            RelayStation @relation(fields: [relayId], references: [id], onDelete: Cascade)
+  batteryLevel     Int?
+  networkStatus    String
+  packetsForwarded Int          @default(0)
+  recordedAt       DateTime     @default(now())
+}
+
+model TripGroup {
+  id        String     @id @default(uuid())
+  guideId   String
+  zoneId    String
+  zone      ForestZone @relation(fields: [zoneId], references: [id])
+  name      String
+  joinCode  String     @unique
+  status    String     @default("ACTIVE")
+  expiresAt DateTime
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorId      String?
+  actor        User?    @relation(fields: [actorId], references: [id])
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
